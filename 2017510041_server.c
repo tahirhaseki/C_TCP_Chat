@@ -45,8 +45,8 @@ ChatRoom* initializeChatRoom(char *name,Client* owner,int isPrivate,char* passwo
     r->owner = owner;
     r->next = NULL;
     r->prev = NULL;
-    password = calloc(1,20);
-    if(strcmp(password,"")!=0)
+    r->password = calloc(1,20);
+    if(password != NULL)
         strcpy(r->password,password);
     return r;
 }
@@ -92,10 +92,10 @@ void printRoomsToScreen(int clientInfo){
 
     //write(clientInfo,room,sizeof(room));
 }
-void sendMessageToRoom(int roomID,char * message){
+void sendMessageToRoom(int client,int roomID,char * message){
     Client *temp = clientRoot->next;
     while(temp!= NULL){
-        if(temp->currentRoom == roomID)
+        if(temp->currentRoom == roomID && temp->connectionInfo != client)
             write(temp->connectionInfo,message,200);
         temp=temp->next;
     }
@@ -137,23 +137,57 @@ void *connection_handler(void *newClient)
                 printRoomsToScreen(client->connectionInfo);
             }
             else if(strcmp(command,"-create") == 0){
+                int notUnique = 0;
                 ChatRoom* newRoom = initializeChatRoom(content,client,0,NULL);
+                ChatRoom *temp = roomRoot;
+                while(temp != NULL){
+                    if(strcmp(temp->name,content)==0){
+                        write(client->connectionInfo,"Room Name must be unique.\n",27);
+                        notUnique = 1;
+                        break;
+                    }
+                    temp = temp->next;
+                }
+                if(notUnique){
+                    continue;
+                }
                 newRoom->prev = roomCurrent;
                 roomCurrent->next = newRoom;
                 roomCurrent = newRoom;
+                client->currentRoom = newRoom->id;
+                write(client->connectionInfo,"clear",6);
             }
             else if(strcmp(command,"-pcreate") == 0){
-                ChatRoom* newRoom = initializeChatRoom(content,client,1,NULL);
+                char * roomName = malloc(200);
+                strcpy(roomName,content);
+                ChatRoom *temp = roomRoot;
+                while(temp != NULL){
+                    if(strcmp(temp->name,roomName)==0){
+                        write(client->connectionInfo,"Room Name must be unique.\n",27);
+                        continue;
+                    }
+                    temp = temp->next;
+                }
+                write(client->connectionInfo,"Enter password:",16);
+                bzero(recv_buffer,sizeof(recv_buffer));
+                read(client->connectionInfo, recv_buffer, sizeof(recv_buffer));
+                content = strtok(recv_buffer, "\n");
+                ChatRoom* newRoom = initializeChatRoom(roomName,client,1,content);
                 newRoom->prev = roomCurrent;
                 roomCurrent->next = newRoom;
                 roomCurrent = newRoom;
+                client->currentRoom = newRoom->id;
+                write(client->connectionInfo,"clear",6);
             }
             else if(strcmp(command,"-enter") == 0){
                 ChatRoom *temp = roomRoot;
                 while(temp != NULL){
                     if(strcmp(content,temp->name) == 0){
                         if(temp->isPrivate == 0){
-                            client->currentRoom = temp->id; 
+                            client->currentRoom = temp->id;
+                            write(client->connectionInfo,"clear",6);
+                            sprintf(send_buffer,"Room %s",temp->name);
+                            write(client->connectionInfo,send_buffer,200);
                         }
                         else{
                             write(client->connectionInfo,"Enter password:",16);
@@ -161,10 +195,13 @@ void *connection_handler(void *newClient)
                             read(client->connectionInfo, recv_buffer, sizeof(recv_buffer));
                             content = strtok(recv_buffer, "\n");
                             if(strcmp(content,temp->password) == 0) {
-                                client->currentRoom = temp->id; 
+                                client->currentRoom = temp->id;
+                                write(client->connectionInfo,"clear",6);
+                                sprintf(send_buffer,"Room %s",temp->name);
+                                write(client->connectionInfo,send_buffer,200); 
                             }
                             else{
-                                write(client->connectionInfo,"Wrong password.",16);
+                                write(client->connectionInfo,"Wrong password.\n",17);
                             }
                         }
                         break;
@@ -175,20 +212,54 @@ void *connection_handler(void *newClient)
         }
         else{
             if(strcmp(command,"-quit\n") == 0){
+                int flag = 0;
+                Client *tempClient = clientRoot;
+                while(tempClient != NULL){
+                    if(tempClient != client && tempClient->currentRoom == client->currentRoom){
+                        flag++;
+                        break;
+                    }
+                    tempClient = tempClient->next;
+                }
+                if(flag == 0){
+                    ChatRoom *tempRoom = roomRoot;
+                    while(tempRoom->id != client->currentRoom){
+                        tempRoom = tempRoom->next;
+                    }
+                    tempRoom->prev->next = tempRoom->next;
+                    if(tempRoom->next != NULL){
+                        tempRoom->next->prev = tempRoom->prev;
+                    }
+                    if(tempRoom == roomCurrent){
+                        roomCurrent = tempRoom->prev;
+                    }
+                    free(tempRoom);
+                }
                 client->currentRoom = -1;
+                write(client->connectionInfo,"clear",6);
+                write(client->connectionInfo,"Lobby",6);
             }
             else if(strcmp(command,"-msg") == 0){
-                sprintf(send_buffer,"%s : %s\n",client->username,content);
-                sendMessageToRoom(client->currentRoom,send_buffer);
+                sprintf(send_buffer,"%s : %s",client->username,content);
+                sendMessageToRoom(client->connectionInfo,client->currentRoom,send_buffer);
+            }
+            else if(recv_buffer[0] != '-'){
+                sprintf(send_buffer,"%s : %s",client->username,recv_buffer);
+                sendMessageToRoom(client->connectionInfo,client->currentRoom,send_buffer);
             }
         }
         if(strcmp(command,"-whoami\n") == 0){
-            write(client->connectionInfo,client->username,sizeof(client->username));
+            sprintf(send_buffer,"%s\n",client->username);
+            write(client->connectionInfo,send_buffer,200);
         }
         else if(strcmp(command,"-exit\n") == 0){
             if(client->next != NULL)
                 client->next->prev = client->prev;
             client->prev->next = client->next;
+            if(client == clientCurrent){
+                clientCurrent = client->prev;
+            }
+            free(client);
             break;
         }
         else if(send(client->connectionInfo,"OK",5,MSG_NOSIGNAL) == -1)
