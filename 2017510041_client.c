@@ -4,9 +4,6 @@
 #include <string.h> 
 #include <sys/socket.h> 
 #include<pthread.h>   // for threading, link with lpthread
-#define MAX 200 
-#define PORT 8888 
-#define SA struct sockaddr 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
@@ -16,7 +13,7 @@
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 void listener(void * conn_info){
-	char buffer[MAX];
+	char buffer[200];
 	while(1){
 		bzero(buffer, sizeof(buffer)); 
 		read(conn_info, buffer, sizeof(buffer)); 
@@ -24,15 +21,15 @@ void listener(void * conn_info){
 			system("clear");
 			continue;
 		}
-		if(strcmp(buffer,"OK") != 0){
+		//if(strcmp(buffer,"OK") != 0){
 			printf(ANSI_COLOR_YELLOW "%s" ANSI_COLOR_RESET, buffer);
-		}
+		//}
 		fflush(stdout);
 	}
 }
-void func(int sockfd) 
+void handler(int sockfd) 
 { 
-	char buff[MAX]; 
+	char buff[200]; 
 	int flag = 1;
 	int n; 
 	read(sockfd, buff, sizeof(buff)); 
@@ -67,7 +64,7 @@ int main()
 	int sockfd, connfd; 
 	struct sockaddr_in servaddr, cli; 
 
-	// socket create and varification 
+	// Create socket
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
 	if (sockfd == -1) { 
 		printf("socket creation failed...\n"); 
@@ -77,13 +74,12 @@ int main()
 		printf("Socket successfully created..\n"); 
 	bzero(&servaddr, sizeof(servaddr)); 
 
-	// assign IP, PORT 
 	servaddr.sin_family = AF_INET; 
 	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
-	servaddr.sin_port = htons(8888); 
+	servaddr.sin_port = htons(3205); 
 
 	// connect the client socket to server socket 
-	if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
+	if (connect(sockfd, (struct socketaddr*)&servaddr, sizeof(servaddr)) != 0) { 
 		printf("connection with the server failed...\n"); 
 		exit(0); 
 	} 
@@ -91,8 +87,8 @@ int main()
 		printf("connected to the server..\n"); 
 		printf("sockfd =  %d\n",sockfd); 
     }
-	// function for chat 
-	func(sockfd); 
+	// function for connection 
+	handler(sockfd); 
 
 	// close the socket 
 	close(sockfd); 

@@ -67,13 +67,11 @@ void printRoomsToScreen(int clientInfo){
     while(tempRoom != NULL){
         bzero(room,sizeof(room));
         if(!(tempRoom->isPrivate)){
-            //printf("%d | %s | Users: ",tempRoom->id,tempRoom->name);
             sprintf(temp,"%d | %s | Users: ",tempRoom->id,tempRoom->name);
             strcat(room,temp);
             tempClient = clientRoot;
             while(tempClient != NULL){
                 if(tempClient->currentRoom == tempRoom->id){
-                    //printf("%s ",tempClient->username);
                     sprintf(temp,"%s ",tempClient->username); 
                     strcat(room,temp);
                 }
@@ -82,15 +80,12 @@ void printRoomsToScreen(int clientInfo){
             strcat(room,"\n");
         }
         else{
-            //printf("%d | %s | Private\n",tempRoom->id,tempRoom->name);
             sprintf(temp,"%d | %s | Private\n",tempRoom->id,tempRoom->name);
             strcat(room,temp);
         }
         tempRoom = tempRoom->next;
         send(clientInfo,room,200,0);
     }
-
-    //write(clientInfo,room,sizeof(room));
 }
 void sendMessageToRoom(int client,int roomID,char * message){
     Client *temp = clientRoot->next;
@@ -129,8 +124,10 @@ void *connection_handler(void *newClient)
     {
         bzero(recv_buffer,sizeof(recv_buffer));
         read(client->connectionInfo, recv_buffer, sizeof(recv_buffer));
+        char * tempRecv = malloc(200);
+        strcpy(tempRecv,recv_buffer);
         char* content;
-        char *command = strtok(recv_buffer, " "); 
+        char *command = strtok(tempRecv, " "); 
         content = strtok(NULL, "\n"); 
         if(client->currentRoom == -1){
             if(strcmp(command,"-list\n") == 0 || strcmp(command,"-list") == 0){
@@ -156,6 +153,10 @@ void *connection_handler(void *newClient)
                 roomCurrent = newRoom;
                 client->currentRoom = newRoom->id;
                 write(client->connectionInfo,"clear",6);
+                sleep(0.1);
+                sprintf(send_buffer,"Room: %s\n",newRoom->name);
+                write(client->connectionInfo,send_buffer,200);
+                sleep(0.1);
             }
             else if(strcmp(command,"-pcreate") == 0){
                 char * roomName = malloc(200);
@@ -178,6 +179,9 @@ void *connection_handler(void *newClient)
                 roomCurrent = newRoom;
                 client->currentRoom = newRoom->id;
                 write(client->connectionInfo,"clear",6);
+                sleep(0.1);
+                sprintf(send_buffer,"Room: %s\n",newRoom->name);
+                write(client->connectionInfo,send_buffer,200);
             }
             else if(strcmp(command,"-enter") == 0){
                 ChatRoom *temp = roomRoot;
@@ -186,7 +190,8 @@ void *connection_handler(void *newClient)
                         if(temp->isPrivate == 0){
                             client->currentRoom = temp->id;
                             write(client->connectionInfo,"clear",6);
-                            sprintf(send_buffer,"Room %s",temp->name);
+                            sleep(0.1);
+                            sprintf(send_buffer,"Room: %s\n",temp->name);
                             write(client->connectionInfo,send_buffer,200);
                         }
                         else{
@@ -197,7 +202,8 @@ void *connection_handler(void *newClient)
                             if(strcmp(content,temp->password) == 0) {
                                 client->currentRoom = temp->id;
                                 write(client->connectionInfo,"clear",6);
-                                sprintf(send_buffer,"Room %s",temp->name);
+                                sleep(0.1);
+                                sprintf(send_buffer,"Room: %s\n",temp->name);
                                 write(client->connectionInfo,send_buffer,200); 
                             }
                             else{
@@ -237,10 +243,11 @@ void *connection_handler(void *newClient)
                 }
                 client->currentRoom = -1;
                 write(client->connectionInfo,"clear",6);
-                write(client->connectionInfo,"Lobby",6);
+                sleep(0.1);
+                write(client->connectionInfo,"Lobby\n",6);
             }
             else if(strcmp(command,"-msg") == 0){
-                sprintf(send_buffer,"%s : %s",client->username,content);
+                sprintf(send_buffer,"%s : %s\n",client->username,content);
                 sendMessageToRoom(client->connectionInfo,client->currentRoom,send_buffer);
             }
             else if(recv_buffer[0] != '-'){
@@ -262,8 +269,8 @@ void *connection_handler(void *newClient)
             free(client);
             break;
         }
-        else if(send(client->connectionInfo,"OK",5,MSG_NOSIGNAL) == -1)
-            break;
+        /*else if(send(client->connectionInfo,"OK",5,MSG_NOSIGNAL) == -1)
+            break;*/
 
         printf("Read: %s",recv_buffer);
         if(recv_buffer[0] == '-'){
@@ -287,7 +294,7 @@ void main(){
      
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons(8888);
+    server.sin_port = htons(3205);
      
     if(bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
     {
