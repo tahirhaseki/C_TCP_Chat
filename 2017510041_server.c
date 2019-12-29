@@ -6,6 +6,13 @@
 #include<unistd.h>    // for write
 #include<pthread.h>   // for threading, link with lpthread
 
+/*
+**  ASSUMPTIONS
+**  -There is a default room as General and a default user as system to initialize linked lists.
+**  -Room number and user number in room is not limited.
+*/
+
+// Keeps all information about client also node for list.
 struct Client {
     int connectionInfo;
     char ip[16];
@@ -15,6 +22,7 @@ struct Client {
     struct Client *prev;
 } typedef Client;
 
+// Client creator function.
 Client* initializeClient(int info,struct sockaddr_in clientInfo){
     Client *c = calloc(1,sizeof(Client));
     c->connectionInfo = info;
@@ -27,6 +35,7 @@ Client* initializeClient(int info,struct sockaddr_in clientInfo){
 }
 int roomdId;
 
+// Keeps all information abaout Chat Rooms also node for list.
 struct ChatRoom {
     int id;
     char name[20];
@@ -37,6 +46,7 @@ struct ChatRoom {
     struct ChatRoom* prev;
 } typedef ChatRoom;
 
+// Chat room creator function.
 ChatRoom* initializeChatRoom(char *name,Client* owner,int isPrivate,char* password){
     ChatRoom* r = malloc(sizeof(ChatRoom));
     r->id = ++roomdId;
@@ -51,14 +61,11 @@ ChatRoom* initializeChatRoom(char *name,Client* owner,int isPrivate,char* passwo
     return r;
 }
 
+// Defining nodes for lists.
 Client *clientRoot,*clientCurrent;
 ChatRoom *roomRoot,*roomCurrent;
 
-char* memConcat(const char* s1,const char s2){
-    char *result = malloc(strlen(s1) + strlen(s2) + 1);
-    return result;
-}
-
+// Function for -list command.
 void printRoomsToScreen(int clientInfo){
     ChatRoom *tempRoom = roomRoot;
     Client *tempClient = clientRoot;
@@ -87,6 +94,8 @@ void printRoomsToScreen(int clientInfo){
         send(clientInfo,room,200,0);
     }
 }
+
+// Checks every client and sends message if they are in the given room.
 void sendMessageToRoom(int client,int roomID,char * message){
     Client *temp = clientRoot->next;
     while(temp!= NULL){
@@ -96,6 +105,7 @@ void sendMessageToRoom(int client,int roomID,char * message){
     }
 }
 
+// Main handler function.
 void *connection_handler(void *newClient)
 {
     char *username;
@@ -104,6 +114,7 @@ void *connection_handler(void *newClient)
 
     Client *client = (Client *)newClient;   
 
+    // Welcome screen.
     strcpy(send_buffer,"Hello Client, Welcome to DEU Chat\nPlease enter a username(Min 3 Max 10 character): ");
     write(client->connectionInfo , send_buffer , sizeof(send_buffer));
     while(1){
@@ -120,6 +131,8 @@ void *connection_handler(void *newClient)
             break;
         }
     }   
+
+    // Working stage listen clients in a loop.
     while (1)
     {
         bzero(recv_buffer,sizeof(recv_buffer));
@@ -128,7 +141,9 @@ void *connection_handler(void *newClient)
         strcpy(tempRecv,recv_buffer);
         char* content;
         char *command = strtok(tempRecv, " "); 
-        content = strtok(NULL, "\n"); 
+        content = strtok(NULL, "\n");
+
+        // Commands for lobby.
         if(client->currentRoom == -1){
             if(strcmp(command,"-list\n") == 0 || strcmp(command,"-list") == 0){
                 printRoomsToScreen(client->connectionInfo);
@@ -216,6 +231,7 @@ void *connection_handler(void *newClient)
                 }
             }
         }
+        // In room commands.
         else{
             if(strcmp(command,"-quit\n") == 0){
                 int flag = 0;
@@ -269,15 +285,11 @@ void *connection_handler(void *newClient)
             free(client);
             break;
         }
-        /*else if(send(client->connectionInfo,"OK",5,MSG_NOSIGNAL) == -1)
-            break;*/
-
-        printf("Read: %s",recv_buffer);
+        printf("Read: %s ",recv_buffer);
         if(recv_buffer[0] == '-'){
             printf("Incoming command: %s",recv_buffer);
         }
     }
-    
     return 0;
 }
 void main(){
@@ -285,6 +297,7 @@ void main(){
     struct sockaddr_in server, client;
     char *message;
      
+    // Socket creating.
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1)
     {
@@ -295,13 +308,14 @@ void main(){
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(3205);
-     
+    
     if(bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
     {
         puts("Binding failed");
         return 1;
     }
 
+    // Creating default client and chat room.
     clientRoot = initializeClient(socket_desc,server);
     strcpy(clientRoot->username,"system");
     clientCurrent = clientRoot;
@@ -329,7 +343,6 @@ void main(){
         }
 
         puts("Handler assigned");
-
     }
     puts("Program Ending.");
 }

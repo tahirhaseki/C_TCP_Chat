@@ -4,14 +4,11 @@
 #include <string.h> 
 #include <sys/socket.h> 
 #include<pthread.h>   // for threading, link with lpthread
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
+// Color codes for console.
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
-#define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+// Listener function for additional thread.
 void listener(void * conn_info){
 	char buffer[200];
 	while(1){
@@ -21,12 +18,11 @@ void listener(void * conn_info){
 			system("clear");
 			continue;
 		}
-		//if(strcmp(buffer,"OK") != 0){
-			printf(ANSI_COLOR_YELLOW "%s" ANSI_COLOR_RESET, buffer);
-		//}
+		printf(ANSI_COLOR_YELLOW "%s" ANSI_COLOR_RESET, buffer);
 		fflush(stdout);
 	}
 }
+// Main handler function using for sending data to server.
 void handler(int sockfd) 
 { 
 	char buff[200]; 
@@ -41,9 +37,9 @@ void handler(int sockfd)
 		bzero(buff, sizeof(buff));
 		n = 0; 
 		fflush(stdout);
-		while ((buff[n++] = getchar()) != '\n') 
-            ; 
-		write(sockfd, buff, sizeof(buff)); 
+		// Below loop reads from console.
+		while ((buff[n++] = getchar()) != '\n'); 
+		write(sockfd, buff, sizeof(buff));   // Sends input to server.
 		if ((strncmp(buff, "-exit", 4)) == 0) { 
 			printf("Client Exit...\n"); 
 			break; 
@@ -63,7 +59,6 @@ int main()
 { 
 	int sockfd, connfd; 
 	struct sockaddr_in servaddr, cli; 
-
 	// Create socket
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
 	if (sockfd == -1) { 
